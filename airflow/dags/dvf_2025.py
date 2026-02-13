@@ -11,7 +11,7 @@ from airflow.sdk import dag, task
 
 
 
-DVF_URL = "https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-234902/valeursfoncieres-2025-s1.txt.zip"
+DVF_URL = "https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-234902/THIS_WILL_404"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
 
 
