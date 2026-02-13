@@ -1,7 +1,13 @@
-from airflow.sdk import dag, task
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
+
+import os
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
+from airflow.sdk import dag, task
+
 
 def notify_failure(context):
     url = os.environ.get("ALERT_WEBHOOK_URL")
