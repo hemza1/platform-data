@@ -1,14 +1,36 @@
 # airflow/dags/dvf_2025.py
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
 from airflow.sdk import dag, task
+import requests 
 
 DVF_URL = "https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-234902/valeursfoncieres-2025-s1.txt.zip"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
+
+
+def notify_failure(context):
+    url = os.environ.get("ALERT_WEBHOOK_URL")
+    if not url:
+        return
+
+    ti = context["ti"]
+    payload = {
+        "dag_id": ti.dag_id,
+        "task_id": ti.task_id,
+        "run_id": context.get("run_id"),
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "state": "failed",
+    }
+    requests.post(
+        url,
+        data=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+        timeout=10,
+    )
 
 
 @dag(

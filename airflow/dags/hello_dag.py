@@ -1,6 +1,27 @@
-from datetime import datetime
 from airflow.sdk import dag, task
+from datetime import datetime, timedelta, timezone
 
+import requests
+
+def notify_failure(context):
+    url = os.environ.get("ALERT_WEBHOOK_URL")
+    if not url:
+        return
+
+    ti = context["ti"]
+    payload = {
+        "dag_id": ti.dag_id,
+        "task_id": ti.task_id,
+        "run_id": context.get("run_id"),
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "state": "failed",
+    }
+    requests.post(
+        url,
+        data=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+        timeout=10,
+    )
 
 @dag(
     dag_id="hello_world_simple",
