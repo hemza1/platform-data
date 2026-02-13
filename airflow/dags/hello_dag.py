@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime ,timezone
 
 import requests
 from airflow.sdk import dag, task
