@@ -20,7 +20,7 @@ def hello_world_dag():
     def consume_message(message: str) -> None:
         print(f"Consumed message: {message}")
 
-    consume_message(say_hello()
+    consume_message(say_hello())
 
 
 hello_world = hello_world_dag()
