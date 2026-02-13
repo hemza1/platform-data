@@ -1,12 +1,14 @@
 # airflow/dags/dvf_2025.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import os
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 from airflow.sdk import dag, task
-import requests 
+
 
 DVF_URL = "https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-234902/valeursfoncieres-2025-s1.txt.zip"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
