@@ -1,9 +1,6 @@
-from __future__ import annotations
-
 import os
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 
 import requests
 from airflow.sdk import dag, task
