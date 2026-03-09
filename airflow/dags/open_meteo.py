@@ -2,16 +2,61 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import requests
+from sqlalchemy import create_engine
+
 from airflow.sdk import dag, task
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 OUT_DIR = Path("/opt/airflow/data/meteo")
 
-# Exemple: Marseille (tes paramètres)
 LAT = 43.297
 LON = 5.3811
-
 API_URL = "https://api.open-meteo.com/v1/forecast"
+
+TRANSFORM_METEO_SQL = """
+DROP TABLE IF EXISTS silver.meteo_quotidien;
+
+CREATE TABLE silver.meteo_quotidien AS
+SELECT
+    date_meteo::date               AS date_meteo,
+    COALESCE(weather_code::int, 0) AS weather_code
+FROM bronze.meteo_quotidien
+;
+"""
+
+
+def load_meteo_to_bronze():
+    """Lecture du JSON -> insertion dans bronze.meteo_quotidien."""
+    src = OUT_DIR / "marseille_forecast.json"
+    if not src.exists():
+        raise FileNotFoundError(f"Fichier non trouvé : {src}")
+
+    with open(src, encoding="utf-8") as f:
+        data = json.load(f)
+
+    daily = data["daily"]
+
+    df = pd.DataFrame({
+        "date_meteo": daily["time"],
+        "weather_code": daily["weather_code"],
+    })
+
+    engine = create_engine(
+        "postgresql://svc_dwh:svc_dwh@postgres-warehouse:5432/warehouse"
+    )
+
+    df.to_sql(
+        "meteo_quotidien",
+        engine,
+        schema="bronze",
+        if_exists="append",
+        index=False,
+    )
+
+    print(f"{len(df)} lignes chargées dans bronze.meteo_quotidien")
 
 
 @dag(
@@ -31,7 +76,7 @@ def open_meteo_dag():
             "longitude": LON,
             "daily": "weather_code",
             "hourly": "temperature_2m",
-            "timezone": "auto",  # tu peux mettre "Europe/Paris" si tu préfères
+            "timezone": "auto",
         }
 
         r = requests.get(API_URL, params=params, timeout=(10, 60))
@@ -49,7 +94,20 @@ def open_meteo_dag():
         print(f"Météo sauvegardée: {out_path}")
         return str(out_path)
 
-    fetch_and_save()
+    task_fetch = fetch_and_save()
+
+    load_bronze = PythonOperator(
+        task_id="load_to_bronze",
+        python_callable=load_meteo_to_bronze,
+    )
+
+    transform_silver = SQLExecuteQueryOperator(
+        task_id="transform_to_silver",
+        conn_id="postgres_warehouse",
+        sql=TRANSFORM_METEO_SQL,
+    )
+
+    task_fetch >> load_bronze >> transform_silver
 
 
 open_meteo = open_meteo_dag()
