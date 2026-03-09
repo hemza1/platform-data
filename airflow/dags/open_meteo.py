@@ -2,9 +2,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
+
 import requests
-from sqlalchemy import create_engine
+
 
 from airflow.sdk import dag, task
 from airflow.providers.standard.operators.python import PythonOperator
@@ -29,6 +29,8 @@ FROM bronze.meteo_quotidien
 
 
 def load_meteo_to_bronze():
+    from sqlalchemy import create_engine
+    import pandas as pd
     """Lecture du JSON -> insertion dans bronze.meteo_quotidien."""
     src = OUT_DIR / "marseille_forecast.json"
     if not src.exists():
