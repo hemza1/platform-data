@@ -20,7 +20,7 @@ DROP TABLE IF EXISTS silver.dvf_2025_s1;
 
 CREATE TABLE silver.dvf_2025_s1 AS
 SELECT
-    date_mutation::date AS date_mutation,
+    TO_DATE(date_mutation, 'DD/MM/YYYY') AS date_mutation,
 
     CASE
         WHEN valeur_fonciere IS NULL OR valeur_fonciere = ''
