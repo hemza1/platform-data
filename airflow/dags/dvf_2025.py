@@ -20,7 +20,6 @@ DROP TABLE IF EXISTS silver.dvf_2025_s1;
 
 CREATE TABLE silver.dvf_2025_s1 AS
 SELECT
-    id_mutation,
     date_mutation::date AS date_mutation,
 
     CASE
@@ -54,6 +53,8 @@ SELECT
 
     nature_mutation
 FROM bronze.dvf_2025_s1
+WHERE valeur_fonciere IS NOT NULL
+  AND valeur_fonciere <> ''
 ;
 """
 
