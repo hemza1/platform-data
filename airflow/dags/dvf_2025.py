@@ -8,9 +8,54 @@ from pathlib import Path
 
 import requests
 from airflow.sdk import dag, task
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
-DVF_URL = "https://static.data.gouv.fr/resources/demandes-de-valeurs-foncieres/20251018-234902/THIS_WILL_404"
+DVF_URL = "A_REMPLACER_PAR_LA_VRAIE_URL_DATA_GOUV"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
+
+
+TRANSFORM_DVF_SQL = """
+DROP TABLE IF EXISTS silver.dvf_2025_s1;
+
+CREATE TABLE silver.dvf_2025_s1 AS
+SELECT
+    id_mutation,
+    date_mutation::date AS date_mutation,
+
+    CASE
+        WHEN valeur_fonciere IS NULL OR valeur_fonciere = ''
+            THEN NULL
+        ELSE REPLACE(valeur_fonciere, ',', '.')::numeric
+    END AS valeur_fonciere,
+
+    code_postal,
+    commune,
+    code_departement,
+    type_local,
+
+    CASE
+        WHEN surface_reelle_bati IS NULL OR surface_reelle_bati = ''
+            THEN NULL
+        ELSE REPLACE(surface_reelle_bati, ',', '.')::numeric
+    END AS surface_reelle_bati,
+
+    CASE
+        WHEN nombre_pieces_principales IS NULL OR nombre_pieces_principales = ''
+            THEN NULL
+        ELSE nombre_pieces_principales::int
+    END AS nombre_pieces_principales,
+
+    CASE
+        WHEN surface_terrain IS NULL OR surface_terrain = ''
+            THEN NULL
+        ELSE REPLACE(surface_terrain, ',', '.')::numeric
+    END AS surface_terrain,
+
+    nature_mutation
+FROM bronze.dvf_2025_s1
+;
+"""
 
 
 def notify_failure(context):
@@ -34,12 +79,73 @@ def notify_failure(context):
     )
 
 
+def load_dvf_to_bronze():
+    """Lecture du fichier zip DVF -> chargement dans bronze.dvf_2025_s1."""
+    import pandas as pd
+    from sqlalchemy import create_engine
+
+    if not OUT_PATH.exists():
+        raise FileNotFoundError(f"Fichier non trouvé : {OUT_PATH}")
+
+    # DVF est un fichier texte zippé ; on charge tout en texte
+    df = pd.read_csv(
+        OUT_PATH,
+        sep="|",
+        compression="zip",
+        dtype=str,
+        low_memory=False,
+    )
+
+    # Normalisation des noms de colonnes pour simplifier le SQL
+    df.columns = [
+        c.strip()
+         .lower()
+         .replace(" ", "_")
+         .replace("-", "_")
+         .replace("'", "")
+        for c in df.columns
+    ]
+
+    # On garde seulement un sous-ensemble utile pour démarrer
+    cols_to_keep = [
+        "id_mutation",
+        "date_mutation",
+        "nature_mutation",
+        "valeur_fonciere",
+        "code_postal",
+        "commune",
+        "code_departement",
+        "type_local",
+        "surface_reelle_bati",
+        "nombre_pieces_principales",
+        "surface_terrain",
+    ]
+
+    existing_cols = [c for c in cols_to_keep if c in df.columns]
+    df = df[existing_cols]
+
+    engine = create_engine(
+        "postgresql://svc_dwh:svc_dwh@postgres:5432/warehouse"
+    )
+
+    # Comme la source est toujours le même fichier, on remplace pour éviter les doublons
+    df.to_sql(
+        "dvf_2025_s1",
+        engine,
+        schema="bronze",
+        if_exists="replace",
+        index=False,
+    )
+
+    print(f"{len(df)} lignes chargées dans bronze.dvf_2025_s1")
+
+
 @dag(
     dag_id="extract_dvf_2025_s1",
     schedule="@weekly",
     start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=["seance2", "extraction", "dvf"],
+    tags=["seance3", "extract", "load", "transform", "dvf"],
 )
 def dvf_2025_dag():
     @task(
@@ -59,9 +165,23 @@ def dvf_2025_dag():
                         f.write(chunk)
 
         tmp_path.replace(OUT_PATH)
+        print(f"DVF téléchargé : {OUT_PATH}")
         return str(OUT_PATH)
 
-    download_dvf()
+    task_download = download_dvf()
+
+    load_bronze = PythonOperator(
+        task_id="load_to_bronze",
+        python_callable=load_dvf_to_bronze,
+    )
+
+    transform_silver = SQLExecuteQueryOperator(
+        task_id="transform_to_silver",
+        conn_id="postgres_warehouse",
+        sql=TRANSFORM_DVF_SQL,
+    )
+
+    task_download >> load_bronze >> transform_silver
 
 
 dvf_2025 = dvf_2025_dag()
