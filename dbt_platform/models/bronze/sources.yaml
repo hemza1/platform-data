@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Données brutes chargées en séance 3
+    database: warehouse
+    schema: bronze
+    tables:
+      - name: dvf_2025_s1
+        description: Mutations DVF (Demandes de valeurs foncières), format pipe
+      - name: meteo_quotidien
+        description: Données météo quotidiennes Open-Meteo

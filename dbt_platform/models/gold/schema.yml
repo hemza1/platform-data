@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: fact_mutations
+    columns:
+      - name: id_mutation
+        tests:
+          - unique
+          - not_null

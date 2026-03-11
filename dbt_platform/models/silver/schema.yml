@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: meteo_quotidien
+    columns:
+      - name: date_meteo
+        description: Date des données météo
+        tests:
+          - not_null
+  - name: dvf_mutations
+    columns:
+      - name: id_mutation
+        tests:
+          - unique
+          - not_null
