@@ -9,6 +9,7 @@ import requests
 from airflow.sdk import dag, task
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 
 OUT_DIR = Path("/opt/airflow/data/meteo")
 
@@ -109,7 +110,13 @@ def open_meteo_dag():
         sql=TRANSFORM_METEO_SQL,
     )
 
-    task_fetch >> load_bronze >> transform_silver
+    trigger_dbt = TriggerDagRunOperator(
+        task_id="trigger_dbt_platform",
+        trigger_dag_id="dbt_platform",
+        wait_for_completion=False,
+    )
+
+    task_fetch >> load_bronze >> transform_silver >> trigger_dbt
 
 
 open_meteo = open_meteo_dag()

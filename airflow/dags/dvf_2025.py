@@ -10,6 +10,7 @@ import requests
 from airflow.sdk import dag, task
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 
 DVF_URL = "https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
@@ -182,7 +183,13 @@ def dvf_2025_dag():
         sql=TRANSFORM_DVF_SQL,
     )
 
-    task_download >> load_bronze >> transform_silver
+    trigger_dbt = TriggerDagRunOperator(
+        task_id="trigger_dbt_platform",
+        trigger_dag_id="dbt_platform",
+        wait_for_completion=False,
+    )
+
+    task_download >> load_bronze >> transform_silver >> trigger_dbt
 
 
 dvf_2025 = dvf_2025_dag()
