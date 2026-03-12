@@ -1,0 +1,12 @@
+dbt_platform:
+  target: prod
+  outputs:
+    prod:
+      type: postgres
+      host: "{{ env_var('DBT_POSTGRES_HOST', 'postgres-warehouse') }}"
+      port: 5432
+      user: "{{ env_var('DBT_POSTGRES_USER', 'platform') }}"
+      password: "{{ env_var('DBT_POSTGRES_PASSWORD', 'platform') }}"
+      dbname: "{{ env_var('DBT_POSTGRES_DB', 'warehouse') }}"
+      schema: public
+      threads: 4
