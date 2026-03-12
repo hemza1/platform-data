@@ -1,15 +1,27 @@
 version: 2
 
 models:
-  - name: meteo_quotidien
+  - name: meteo_quotidien_gold
+    description: Donnees meteo quotidiennes nettoyees et typees depuis la couche bronze.
     columns:
       - name: date_meteo
         description: Date des données météo
         tests:
           - not_null
-  - name: dvf_mutations
+      - name: weather_code
+        description: Code meteo standardise (entier).
+
+  - name: dvf_mutations_gold
+    description: Mutations DVF nettoyees (types, normalisation des valeurs, dedoublonnage).
     columns:
       - name: id_mutation
+        description: Identifiant technique de mutation construit a partir des attributs nettoyes.
         tests:
           - unique
           - not_null
+      - name: date_mutation
+        description: Date de la mutation.
+        tests:
+          - not_null
+      - name: valeur_fonciere
+        description: Valeur fonciere de la mutation.

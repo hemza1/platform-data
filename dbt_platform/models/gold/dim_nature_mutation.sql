@@ -6,8 +6,7 @@
 }}
 
 select distinct
-    type_local as type_local_id,
-  type_local,
-    type_local as libelle
+    nature_mutation as nature_mutation_id,
+    nature_mutation
 from {{ ref('dvf_mutations_gold') }}
-where type_local is not null
+where nature_mutation is not null

@@ -1,9 +1,96 @@
 version: 2
 
 models:
-  - name: fact_mutations
+  - name: dim_commune
+    description: Dimension des communes issues des mutations DVF.
     columns:
-      - name: id_mutation
+      - name: commune_id
+        description: Cle naturelle de la commune.
         tests:
           - unique
           - not_null
+      - name: commune
+        description: Libelle de la commune.
+
+  - name: dim_local
+    description: Dimension des types de locaux.
+    columns:
+      - name: type_local_id
+        description: Cle naturelle du type de local.
+        tests:
+          - unique
+          - not_null
+      - name: type_local
+        description: Valeur source du type de local.
+
+  - name: dim_nature_mutation
+    description: Dimension des natures de mutation.
+    columns:
+      - name: nature_mutation_id
+        description: Cle naturelle de la nature de mutation.
+        tests:
+          - unique
+          - not_null
+      - name: nature_mutation
+        description: Libelle de la nature de mutation.
+
+  - name: dim_temps
+    description: Dimension temps au grain jour des dates de mutation.
+    columns:
+      - name: date_id
+        description: Cle calendaire au format YYYYMMDD.
+        tests:
+          - unique
+          - not_null
+      - name: date_mutation
+        description: Date de mutation.
+        tests:
+          - not_null
+
+  - name: fact_mutations
+    description: Table de faits DVF au grain mutation avec mesures et cles vers les dimensions.
+    columns:
+      - name: id_mutation
+        description: Identifiant de la mutation.
+        tests:
+          - unique
+          - not_null
+      - name: date_id
+        description: Cle vers la dimension temps.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_temps')
+                field: date_id
+      - name: commune_id
+        description: Cle vers la dimension commune.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_commune')
+                field: commune_id
+      - name: type_local_id
+        description: Cle vers la dimension type de local.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_local')
+                field: type_local_id
+      - name: nature_mutation_id
+        description: Cle vers la dimension nature de mutation.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_nature_mutation')
+                field: nature_mutation_id
+
+  - name: meteo_quotidien
+    description: Mart meteo quotidien agregé par date.
+    columns:
+      - name: date_meteo
+        description: Date meteo.
+        tests:
+          - unique
+          - not_null
+      - name: nb_observations
+        description: Nombre de lignes source agregees pour la date.

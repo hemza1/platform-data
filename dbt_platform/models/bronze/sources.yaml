@@ -8,5 +8,23 @@ sources:
     tables:
       - name: dvf_2025_s1
         description: Mutations DVF (Demandes de valeurs foncières), format pipe
+        columns:
+          - name: date_mutation
+            description: Date de mutation dans le fichier source DVF.
+          - name: valeur_fonciere
+            description: Valeur fonciere brute de la mutation.
+          - name: surface_reelle_bati
+            description: Surface reelle batie brute.
+          - name: commune
+            description: Nom de la commune.
+          - name: type_local
+            description: Type de local.
+          - name: nature_mutation
+            description: Nature de mutation.
       - name: meteo_quotidien
         description: Données météo quotidiennes Open-Meteo
+        columns:
+          - name: date_meteo
+            description: Date de mesure meteo.
+          - name: weather_code
+            description: Code meteo brut issu de la source Open-Meteo.
