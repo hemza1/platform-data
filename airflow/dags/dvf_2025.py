@@ -142,6 +142,23 @@ def load_dvf_to_bronze():
     print(f"{len(df)} lignes chargées dans bronze.dvf_2025_s1")
 
 
+def fetch_dvf() -> str:
+    """Téléchargement DVF — importable par d'autres DAGs."""
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = OUT_PATH.with_suffix(OUT_PATH.suffix + ".part")
+
+    with requests.get(DVF_URL, stream=True, timeout=(10, 300)) as r:
+        r.raise_for_status()
+        with open(tmp_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
+
+    tmp_path.replace(OUT_PATH)
+    print(f"DVF téléchargé : {OUT_PATH}")
+    return str(OUT_PATH)
+
+
 @dag(
     dag_id="extract_dvf_2025_s1",
     schedule="@weekly",

@@ -62,6 +62,33 @@ def load_meteo_to_bronze():
     print(f"{len(df)} lignes chargées dans bronze.meteo_quotidien")
 
 
+def fetch_meteo() -> str:
+    """Extraction Open-Meteo — importable par d'autres DAGs."""
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    params = {
+        "latitude": LAT,
+        "longitude": LON,
+        "daily": "weather_code",
+        "hourly": "temperature_2m",
+        "timezone": "auto",
+    }
+
+    r = requests.get(API_URL, params=params, timeout=(10, 60))
+    r.raise_for_status()
+    payload = r.json()
+
+    out_path = OUT_DIR / "marseille_forecast.json"
+    tmp_path = out_path.with_suffix(".json.part")
+
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    tmp_path.replace(out_path)
+    print(f"Météo sauvegardée: {out_path}")
+    return str(out_path)
+
+
 @dag(
     dag_id="extract_open_meteo_marseille",
     schedule="@daily",
