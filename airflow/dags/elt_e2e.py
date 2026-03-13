@@ -23,6 +23,8 @@ try:
         fetch_meteo,
         load_dvf_to_bronze,
         load_meteo_to_bronze,
+        put_dvf_to_raw_stage,
+        put_meteo_to_raw_stage,
     )
 except ModuleNotFoundError:
     dags_dir = str(Path(__file__).resolve().parent)
@@ -33,6 +35,8 @@ except ModuleNotFoundError:
         fetch_meteo,
         load_dvf_to_bronze,
         load_meteo_to_bronze,
+        put_dvf_to_raw_stage,
+        put_meteo_to_raw_stage,
     )
 
 DBT_PROJECT_DIR  = "/opt/airflow/dbt_platform"
@@ -65,9 +69,19 @@ def elt_e2e_dag():
         python_callable=load_meteo_to_bronze,
     )
 
+    put_meteo_raw = PythonOperator(
+        task_id="put_meteo_to_raw_stage",
+        python_callable=put_meteo_to_raw_stage,
+    )
+
     load_dvf = PythonOperator(
         task_id="load_dvf_bronze",
         python_callable=load_dvf_to_bronze,
+    )
+
+    put_dvf_raw = PythonOperator(
+        task_id="put_dvf_to_raw_stage",
+        python_callable=put_dvf_to_raw_stage,
     )
 
     run_dbt = BashOperator(
@@ -80,8 +94,8 @@ def elt_e2e_dag():
         bash_command=f"dbt --no-use-colors test {DBT_FLAGS}",
     )
 
-    extract_meteo >> load_meteo
-    extract_dvf >> load_dvf
+    extract_meteo >> put_meteo_raw >> load_meteo
+    extract_dvf >> put_dvf_raw >> load_dvf
     [load_meteo, load_dvf] >> run_dbt >> dbt_test
 
 

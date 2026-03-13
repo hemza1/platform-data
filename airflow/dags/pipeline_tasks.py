@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -154,3 +156,73 @@ def load_dvf_to_bronze():
     )
 
     print(f"{len(df)} lignes chargees dans bronze.dvf_2025_s1")
+
+
+def put_dvf_to_raw_stage(**context):
+    """Depose le fichier DVF brut dans Snowflake RAW_STAGE avec partition annee."""
+    import snowflake.connector
+
+    conn_info = BaseHook.get_connection("snowflake_platform")
+    extra = conn_info.extra_dejson
+
+    cnx = snowflake.connector.connect(
+        account=extra["account"],
+        user=conn_info.login,
+        password=conn_info.password,
+        warehouse=extra["warehouse"],
+        database=extra["database"],
+        schema="BRONZE",
+        role=extra.get("role", "ACCOUNTADMIN"),
+    )
+
+    data_dir = Path(os.environ.get("DATA_DIR", "/opt/airflow/data"))
+    candidates = [
+        data_dir / "dvf" / "dvf_2025.txt",
+        data_dir / "dvf" / "2025" / "valeursfoncieres-2025-s1.txt.zip",
+    ]
+    local_path = next((p for p in candidates if p.exists()), None)
+    if not local_path:
+        raise FileNotFoundError(
+            f"Aucun fichier DVF trouve. Chemins testes: {[str(p) for p in candidates]}"
+        )
+
+    cursor = cnx.cursor()
+    cursor.execute(
+        "PUT file://{src} @PLATFORM_DB.BRONZE.RAW_STAGE/dvf/annee=2025/ "
+        "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(src=local_path)
+    )
+    cursor.close()
+    cnx.close()
+
+
+def put_meteo_to_raw_stage(**context):
+    """Depose le dernier fichier meteo JSON dans Snowflake RAW_STAGE avec partition date."""
+    import snowflake.connector
+
+    conn_info = BaseHook.get_connection("snowflake_platform")
+    extra = conn_info.extra_dejson
+
+    cnx = snowflake.connector.connect(
+        account=extra["account"],
+        user=conn_info.login,
+        password=conn_info.password,
+        warehouse=extra["warehouse"],
+        database=extra["database"],
+        schema="BRONZE",
+        role=extra.get("role", "ACCOUNTADMIN"),
+    )
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    data_dir = Path(os.environ.get("DATA_DIR", "/opt/airflow/data")) / "meteo"
+    files = sorted(data_dir.glob("*.json"))
+    local_path = files[-1] if files else None
+    if not local_path:
+        raise FileNotFoundError(f"Aucun fichier meteo trouve dans {data_dir}")
+
+    cursor = cnx.cursor()
+    cursor.execute(
+        "PUT file://{src} @PLATFORM_DB.BRONZE.RAW_STAGE/meteo/date={d}/ "
+        "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(src=local_path, d=today)
+    )
+    cursor.close()
+    cnx.close()
