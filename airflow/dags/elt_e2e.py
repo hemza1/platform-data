@@ -9,14 +9,25 @@ Dépendances :
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
+import sys
 
 from airflow.sdk import dag
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 
-# Fonctions d'extraction (module-level dans les DAGs existants)
-from open_meteo import fetch_meteo, load_meteo_to_bronze
-from dvf_2025 import fetch_dvf, load_dvf_to_bronze
+# Ensure sibling DAG modules are importable in CI/parsing contexts.
+DAGS_DIR = Path(__file__).resolve().parent
+if str(DAGS_DIR) not in sys.path:
+    sys.path.append(str(DAGS_DIR))
+
+# Fonctions E/L centralisees dans un module sans DAG pour eviter les imports circulaires
+from pipeline_tasks import (
+    fetch_dvf,
+    fetch_meteo,
+    load_dvf_to_bronze,
+    load_meteo_to_bronze,
+)
 
 DBT_PROJECT_DIR  = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
@@ -63,7 +74,9 @@ def elt_e2e_dag():
         bash_command=f"dbt --no-use-colors test {DBT_FLAGS}",
     )
 
-    [extract_meteo, extract_dvf] >> [load_meteo, load_dvf] >> run_dbt >> dbt_test
+    extract_meteo >> load_meteo
+    extract_dvf >> load_dvf
+    [load_meteo, load_dvf] >> run_dbt >> dbt_test
 
 
 elt_e2e = elt_e2e_dag()

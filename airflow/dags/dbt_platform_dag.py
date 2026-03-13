@@ -19,7 +19,7 @@ from datetime import datetime
 from airflow.datasets import Dataset
 from airflow.sdk import dag
 from airflow.providers.standard.operators.bash import BashOperator
-from airflow.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.empty import EmptyOperator
 
 DBT_PROJECT_DIR = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
