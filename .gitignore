@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .airflow_home_ci/
+terraform.tfvars
+.terraform/
+*.tfstate*
