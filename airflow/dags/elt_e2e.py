@@ -16,18 +16,24 @@ from airflow.sdk import dag
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 
-# Ensure sibling DAG modules are importable in CI/parsing contexts.
-DAGS_DIR = Path(__file__).resolve().parent
-if str(DAGS_DIR) not in sys.path:
-    sys.path.append(str(DAGS_DIR))
-
 # Fonctions E/L centralisees dans un module sans DAG pour eviter les imports circulaires
-from pipeline_tasks import (
-    fetch_dvf,
-    fetch_meteo,
-    load_dvf_to_bronze,
-    load_meteo_to_bronze,
-)
+try:
+    from pipeline_tasks import (
+        fetch_dvf,
+        fetch_meteo,
+        load_dvf_to_bronze,
+        load_meteo_to_bronze,
+    )
+except ModuleNotFoundError:
+    dags_dir = str(Path(__file__).resolve().parent)
+    if dags_dir not in sys.path:
+        sys.path.append(dags_dir)
+    from pipeline_tasks import (  # noqa: E402
+        fetch_dvf,
+        fetch_meteo,
+        load_dvf_to_bronze,
+        load_meteo_to_bronze,
+    )
 
 DBT_PROJECT_DIR  = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
