@@ -7,6 +7,8 @@ import requests
 
 
 from airflow.sdk import dag, task
+from airflow.models import Variable
+from airflow.sdk.bases.hook import BaseHook
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
@@ -30,8 +32,8 @@ FROM bronze.meteo_quotidien
 
 
 def load_meteo_to_bronze():
-    from sqlalchemy import create_engine
     import pandas as pd
+    from sqlalchemy import create_engine
     """Lecture du JSON -> insertion dans bronze.meteo_quotidien."""
     src = OUT_DIR / "marseille_forecast.json"
     if not src.exists():
@@ -47,8 +49,11 @@ def load_meteo_to_bronze():
         "weather_code": daily["weather_code"],
     })
 
+    conn = BaseHook.get_connection("postgres_warehouse")
+    port = conn.port or 5432
+    dbname = conn.schema or "warehouse"
     engine = create_engine(
-        "postgresql://svc_dwh:svc_dwh@postgres-warehouse:5432/warehouse"
+        f"postgresql://{conn.login}:{conn.password}@{conn.host}:{port}/{dbname}"
     )
 
     df.to_sql(
@@ -74,7 +79,8 @@ def fetch_meteo() -> str:
         "timezone": "auto",
     }
 
-    r = requests.get(API_URL, params=params, timeout=(10, 60))
+    api_url = Variable.get("OPEN_METEO_API_URL", default_var=API_URL)
+    r = requests.get(api_url, params=params, timeout=(10, 60))
     r.raise_for_status()
     payload = r.json()
 
@@ -109,7 +115,8 @@ def open_meteo_dag():
             "timezone": "auto",
         }
 
-        r = requests.get(API_URL, params=params, timeout=(10, 60))
+        api_url = Variable.get("OPEN_METEO_API_URL", default_var=API_URL)
+        r = requests.get(api_url, params=params, timeout=(10, 60))
         r.raise_for_status()
         payload = r.json()
 

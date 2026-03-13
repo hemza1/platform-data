@@ -8,6 +8,8 @@ from pathlib import Path
 
 import requests
 from airflow.sdk import dag, task
+from airflow.models import Variable
+from airflow.sdk.bases.hook import BaseHook
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
@@ -126,8 +128,11 @@ def load_dvf_to_bronze():
     existing_cols = [c for c in cols_to_keep if c in df.columns]
     df = df[existing_cols]
 
+    conn = BaseHook.get_connection("postgres_warehouse")
+    port = conn.port or 5432
+    dbname = conn.schema or "warehouse"
     engine = create_engine(
-        "postgresql://svc_dwh:svc_dwh@postgres:5432/warehouse"
+        f"postgresql://{conn.login}:{conn.password}@{conn.host}:{port}/{dbname}"
     )
 
     # Comme la source est toujours le même fichier, on remplace pour éviter les doublons
@@ -146,8 +151,9 @@ def fetch_dvf() -> str:
     """Téléchargement DVF — importable par d'autres DAGs."""
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = OUT_PATH.with_suffix(OUT_PATH.suffix + ".part")
+    dvf_url = Variable.get("DVF_URL", default_var=DVF_URL)
 
-    with requests.get(DVF_URL, stream=True, timeout=(10, 300)) as r:
+    with requests.get(dvf_url, stream=True, timeout=(10, 300)) as r:
         r.raise_for_status()
         with open(tmp_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
@@ -175,8 +181,9 @@ def dvf_2025_dag():
     def download_dvf() -> str:
         OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = OUT_PATH.with_suffix(OUT_PATH.suffix + ".part")
+        dvf_url = Variable.get("DVF_URL", default_var=DVF_URL)
 
-        with requests.get(DVF_URL, stream=True, timeout=(10, 300)) as r:
+        with requests.get(dvf_url, stream=True, timeout=(10, 300)) as r:
             r.raise_for_status()
             with open(tmp_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):

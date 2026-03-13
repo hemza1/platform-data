@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 
 import requests
+from airflow.models import Variable
+from airflow.sdk.bases.hook import BaseHook
 
 # Meteo
 OUT_DIR = Path("/opt/airflow/data/meteo")
@@ -15,6 +17,17 @@ API_URL = "https://api.open-meteo.com/v1/forecast"
 # DVF
 DVF_URL = "https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
+
+
+def _postgres_engine(conn_id: str = "postgres_warehouse"):
+    from sqlalchemy import create_engine
+
+    conn = BaseHook.get_connection(conn_id)
+    port = conn.port or 5432
+    dbname = conn.schema or "warehouse"
+    return create_engine(
+        f"postgresql://{conn.login}:{conn.password}@{conn.host}:{port}/{dbname}"
+    )
 
 
 def fetch_meteo() -> str:
@@ -29,7 +42,8 @@ def fetch_meteo() -> str:
         "timezone": "auto",
     }
 
-    r = requests.get(API_URL, params=params, timeout=(10, 60))
+    api_url = Variable.get("OPEN_METEO_API_URL", default_var=API_URL)
+    r = requests.get(api_url, params=params, timeout=(10, 60))
     r.raise_for_status()
     payload = r.json()
 
@@ -47,7 +61,6 @@ def fetch_meteo() -> str:
 def load_meteo_to_bronze():
     """Lecture du JSON meteo puis insertion dans bronze.meteo_quotidien."""
     import pandas as pd
-    from sqlalchemy import create_engine
 
     src = OUT_DIR / "marseille_forecast.json"
     if not src.exists():
@@ -62,9 +75,7 @@ def load_meteo_to_bronze():
         "weather_code": daily["weather_code"],
     })
 
-    engine = create_engine(
-        "postgresql://svc_dwh:svc_dwh@postgres-warehouse:5432/warehouse"
-    )
+    engine = _postgres_engine("postgres_warehouse")
 
     df.to_sql(
         "meteo_quotidien",
@@ -81,8 +92,9 @@ def fetch_dvf() -> str:
     """Telechargement DVF vers un fichier zip local."""
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = OUT_PATH.with_suffix(OUT_PATH.suffix + ".part")
+    dvf_url = Variable.get("DVF_URL", default_var=DVF_URL)
 
-    with requests.get(DVF_URL, stream=True, timeout=(10, 300)) as r:
+    with requests.get(dvf_url, stream=True, timeout=(10, 300)) as r:
         r.raise_for_status()
         with open(tmp_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
@@ -97,7 +109,6 @@ def fetch_dvf() -> str:
 def load_dvf_to_bronze():
     """Lecture du zip DVF puis chargement dans bronze.dvf_2025_s1."""
     import pandas as pd
-    from sqlalchemy import create_engine
 
     if not OUT_PATH.exists():
         raise FileNotFoundError(f"Fichier non trouve : {OUT_PATH}")
@@ -132,9 +143,7 @@ def load_dvf_to_bronze():
     existing_cols = [c for c in cols_to_keep if c in df.columns]
     df = df[existing_cols]
 
-    engine = create_engine(
-        "postgresql://svc_dwh:svc_dwh@postgres:5432/warehouse"
-    )
+    engine = _postgres_engine("postgres_warehouse")
 
     df.to_sql(
         "dvf_2025_s1",
