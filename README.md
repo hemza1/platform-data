@@ -94,15 +94,63 @@ Admin → Connections → `+`
 | Conn Type | `Postgres` |
 | Host | `postgres-warehouse` |
 | Schema | `warehouse` |
-| Login | `platform` |
-| Password | `platform` |
+| Login | utilisateur DWH (non versionne) |
+| Password | secret saisi dans Airflow |
 | Port | `5432` |
 
 ### 4. Lancer le pipeline
 
-Activer dans l'UI (`http://10.1.1.7:8080`) puis trigger manuel :
-1. `dbt_platform` (si bronze déjà rempli)
-2. ou `extract_dvf_2025_s1` + `extract_open_meteo_marseille` pour un cycle complet
+UI Airflow: `http://10.1.1.7:8080`
+
+1. Activer le DAG `elt_e2e`
+2. Trigger manuel du DAG `elt_e2e`
+3. Verifier les taches dans l'ordre:
+     - `extract_meteo`, `extract_dvf`
+     - `load_meteo_bronze`, `load_dvf_bronze`
+     - `run_dbt`, puis `dbt_test`
+
+## Flux ELT
+
+Le flux principal est orchestre par le DAG `elt_e2e` dans `airflow/dags/elt_e2e.py`.
+
+- E (Extract): API Open-Meteo + source DVF
+- L (Load): chargement des fichiers en tables `bronze.*`
+- T (Transform): `dbt run` puis `dbt test` (silver -> gold)
+
+Verification des donnees apres un run complet:
+- Bronze: `bronze.meteo_quotidien`, `bronze.dvf_2025_s1`
+- Silver: `silver.dvf_mutations_gold`, `silver.meteo_quotidien_gold`
+- Gold: `gold.fact_mutations`, `gold.dim_*`, `gold.meteo_quotidien`
+
+## Gouvernance / Acces
+
+### Roles Airflow
+
+| Role | Capacites attendues |
+|------|----------------------|
+| `Dev` | Lire/declencher les DAGs, modifier Variables et Connections |
+| `Lecture` | Lire DAGs, DAG Runs, Task Instances, logs; pas de modification |
+
+Configuration UI:
+1. `Admin -> Roles`: creer `Dev` et `Lecture`
+2. `Admin -> Users`: creer un utilisateur par role
+
+Test RBAC a realiser:
+1. Se connecter avec l'utilisateur `Lecture`
+2. Ouvrir `Admin -> Variables` puis tenter `Edit` ou `+`
+3. Ouvrir `Admin -> Connections` puis tenter `Edit` ou `+`
+4. Le resultat attendu est un refus (bouton absent/desactive ou erreur `403`)
+
+### Gestion des secrets
+
+Les DAGs lisent les secrets depuis Airflow, pas depuis le code versionne:
+
+- Connection: `postgres_warehouse` (host/login/password/schema/port)
+- Variables:
+    - `DVF_URL`
+    - `OPEN_METEO_API_URL`
+
+Rappel: ne jamais committer de mot de passe, token ou cle API en clair dans le depot.
 
 ## Modèles dbt
 
