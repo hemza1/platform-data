@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import requests
 from airflow.sdk import dag, task
@@ -88,7 +89,7 @@ def load_dvf_to_bronze():
     role = extra.get("role", "ACCOUNTADMIN")
 
     engine = create_engine(
-        f"snowflake://{conn.login}:{conn.password}@{account}/"
+        f"snowflake://{conn.login}:{quote_plus(conn.password)}@{account}/"
         f"{database}/BRONZE?warehouse={warehouse}&role={role}"
     )
 
