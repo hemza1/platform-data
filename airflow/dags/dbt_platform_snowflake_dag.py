@@ -10,8 +10,12 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 DBT_PROJECT_DIR = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
 DBT_CMD = "dbt --no-use-colors"
-DBT_FLAGS = f"--profiles-dir {DBT_PROFILES_DIR} --project-dir {DBT_PROJECT_DIR} --target snowflake"
-
+DBT_FLAGS = (
+    f"--profiles-dir {DBT_PROFILES_DIR}"
+    f" --project-dir {DBT_PROJECT_DIR}"
+    f" --target snowflake"
+    f" --vars '{{\"source_database\": \"PLATFORM_DB\", \"source_schema\": \"BRONZE\"}}'"
+)
 SILVER_READY = Dataset("dbt://platform/snowflake/silver/ready")
 GOLD_READY   = Dataset("dbt://platform/snowflake/gold/ready")
 

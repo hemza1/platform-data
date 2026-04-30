@@ -10,3 +10,14 @@ dbt_platform:
       dbname: "{{ env_var('DBT_POSTGRES_DB', 'warehouse') }}"
       schema: public
       threads: 4
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('DBT_SNOWFLAKE_ACCOUNT', 'VVSKAZW-EA52792') }}"
+      user: "{{ env_var('DBT_SNOWFLAKE_USER', 'GENOSIS') }}"
+      password: "{{ env_var('DBT_SNOWFLAKE_PASSWORD', 'Sk@teordie2016?') }}"
+      role: "{{ env_var('DBT_SNOWFLAKE_ROLE', 'ACCOUNTADMIN') }}"
+      warehouse: "{{ env_var('DBT_SNOWFLAKE_WAREHOUSE', 'PLATFORM_WH') }}"
+      database: "{{ env_var('DBT_SNOWFLAKE_DATABASE', 'PLATFORM_DB') }}"
+      schema: "{{ env_var('DBT_SNOWFLAKE_SCHEMA', 'SILVER') }}"
+      threads: 4
+      client_session_keep_alive: False
