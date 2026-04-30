@@ -54,7 +54,7 @@ def notify_failure(context):
 
 def load_dvf_to_bronze():
     import pandas as pd
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, text
     from airflow.sdk.bases.hook import BaseHook
 
     if not OUT_PATH.exists():
@@ -93,11 +93,16 @@ def load_dvf_to_bronze():
         f"{database}/BRONZE?warehouse={warehouse}&role={role}"
     )
 
+    # Drop table manually to avoid pandas reflect issue on first run
+    with engine.connect() as con:
+        con.execute(text('DROP TABLE IF EXISTS PLATFORM_DB.BRONZE."DVF_2025_S1"'))
+        con.commit()
+
     df.to_sql(
         "DVF_2025_S1",
         engine,
         schema="BRONZE",
-        if_exists="replace",
+        if_exists="append",
         index=False,
         chunksize=10000,
     )
