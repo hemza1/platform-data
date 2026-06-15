@@ -195,6 +195,8 @@ def elt_snowflake_dag():
     run_dbt_snowflake = TriggerDagRunOperator(
         task_id="run_dbt_snowflake",
         trigger_dag_id="dbt_platform_snowflake",
+        trigger_run_id="elt_snowflake__{{ run_id }}",
+        reset_dag_run=True,
         wait_for_completion=True,
         poke_interval=15,
     )
