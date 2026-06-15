@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ API_URL = "https://api.open-meteo.com/v1/forecast"
 # DVF
 DVF_URL = "https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
+DVF_STAGE_PATH = Path("/opt/airflow/data/dvf/2025/dvf_2025.txt")
 
 
 def _postgres_engine(conn_id: str = "postgres_warehouse"):
@@ -108,6 +110,30 @@ def fetch_dvf() -> str:
     return str(OUT_PATH)
 
 
+def prepare_dvf_for_stage() -> str:
+    """Extrait le fichier texte DVF du ZIP avant son depot dans Snowflake."""
+    if not OUT_PATH.exists():
+        raise FileNotFoundError(f"Fichier DVF non trouve : {OUT_PATH}")
+
+    DVF_STAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = DVF_STAGE_PATH.with_suffix(".txt.part")
+
+    with zipfile.ZipFile(OUT_PATH) as archive:
+        members = [name for name in archive.namelist() if not name.endswith("/")]
+        if len(members) != 1:
+            raise ValueError(
+                f"Le ZIP DVF doit contenir un seul fichier, trouve: {members}"
+            )
+
+        with archive.open(members[0]) as source, open(tmp_path, "wb") as target:
+            while chunk := source.read(1024 * 1024):
+                target.write(chunk)
+
+    tmp_path.replace(DVF_STAGE_PATH)
+    print(f"DVF prepare pour le stage Snowflake : {DVF_STAGE_PATH}")
+    return str(DVF_STAGE_PATH)
+
+
 def load_dvf_to_bronze():
     """Lecture du zip DVF puis chargement dans bronze.dvf_2025_s1."""
     import pandas as pd
@@ -176,23 +202,21 @@ def put_dvf_to_raw_stage(**context):
     )
 
     data_dir = Path(os.environ.get("DATA_DIR", "/opt/airflow/data"))
-    candidates = [
-        data_dir / "dvf" / "dvf_2025.txt",
-        data_dir / "dvf" / "2025" / "valeursfoncieres-2025-s1.txt.zip",
-    ]
-    local_path = next((p for p in candidates if p.exists()), None)
-    if not local_path:
-        raise FileNotFoundError(
-            f"Aucun fichier DVF trouve. Chemins testes: {[str(p) for p in candidates]}"
-        )
+    local_path = data_dir / "dvf" / "2025" / "dvf_2025.txt"
+    if not local_path.exists() or local_path.stat().st_mtime < OUT_PATH.stat().st_mtime:
+        local_path = Path(prepare_dvf_for_stage())
 
-    cursor = cnx.cursor()
-    cursor.execute(
-        "PUT file://{src} @PLATFORM_DB.BRONZE.RAW_STAGE/dvf/annee=2025/ "
-        "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(src=local_path)
-    )
-    cursor.close()
-    cnx.close()
+    try:
+        with cnx.cursor() as cursor:
+            cursor.execute(
+                "PUT file://{src} "
+                "@PLATFORM_DB.BRONZE.RAW_STAGE/dvf/annee=2025/ "
+                "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(
+                    src=local_path.as_posix()
+                )
+            )
+    finally:
+        cnx.close()
 
 
 def put_meteo_to_raw_stage(**context):
@@ -219,10 +243,15 @@ def put_meteo_to_raw_stage(**context):
     if not local_path:
         raise FileNotFoundError(f"Aucun fichier meteo trouve dans {data_dir}")
 
-    cursor = cnx.cursor()
-    cursor.execute(
-        "PUT file://{src} @PLATFORM_DB.BRONZE.RAW_STAGE/meteo/date={d}/ "
-        "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(src=local_path, d=today)
-    )
-    cursor.close()
-    cnx.close()
+    try:
+        with cnx.cursor() as cursor:
+            cursor.execute(
+                "PUT file://{src} "
+                "@PLATFORM_DB.BRONZE.RAW_STAGE/meteo/date={d}/ "
+                "AUTO_COMPRESS=FALSE OVERWRITE=TRUE".format(
+                    src=local_path.as_posix(),
+                    d=today,
+                )
+            )
+    finally:
+        cnx.close()

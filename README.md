@@ -122,6 +122,44 @@ Verification des donnees apres un run complet:
 - Silver: `silver.dvf_mutations_gold`, `silver.meteo_quotidien_gold`
 - Gold: `gold.fact_mutations`, `gold.dim_*`, `gold.meteo_quotidien`
 
+## Lac de données Snowflake
+
+Le flux Snowflake de la séance 7 est orchestré par le DAG
+`elt_snowflake` dans `airflow/dags/elt_snowflake.py`.
+
+Le lac utilise les stages internes du schéma `PLATFORM_DB.BRONZE` :
+
+- `RAW_STAGE` reçoit les fichiers bruts extraits par Airflow.
+- `REFINED_STAGE` est réservé aux exports transformés, notamment Parquet.
+
+Convention de partitionnement du raw :
+
+```text
+@RAW_STAGE/dvf/annee=2025/dvf_2025.txt
+@RAW_STAGE/meteo/date=YYYY-MM-DD/marseille_forecast.json
+```
+
+Déroulement du pipeline :
+
+1. Airflow extrait les sources DVF et Open-Meteo.
+2. Le connecteur Snowflake exécute `PUT` vers les partitions de `RAW_STAGE`.
+3. `COPY INTO` charge les fichiers dans `BRONZE.DVF_2025_S1` et
+   `BRONZE.METEO_RAW`.
+4. Les données météo imbriquées sont exposées dans
+   `BRONZE.METEO_QUOTIDIEN`.
+5. Le DAG déclenche `dbt_platform_snowflake`, qui construit et teste les
+   modèles Silver et Gold.
+
+Contrôles Snowflake après un run :
+
+```sql
+LIST @PLATFORM_DB.BRONZE.RAW_STAGE;
+SELECT COUNT(*) FROM PLATFORM_DB.BRONZE.DVF_2025_S1;
+SELECT COUNT(*) FROM PLATFORM_DB.BRONZE.METEO_QUOTIDIEN;
+SHOW TABLES IN SCHEMA PLATFORM_DB.SILVER;
+SHOW TABLES IN SCHEMA PLATFORM_DB.GOLD;
+```
+
 ## Gouvernance / Acces
 
 ### Roles Airflow
