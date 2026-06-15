@@ -59,30 +59,26 @@ models:
         description: Cle vers la dimension temps.
         tests:
           - relationships:
-              arguments:
-                to: ref('dim_temps')
-                field: date_id
+              to: ref('dim_temps')
+              field: date_id
       - name: commune_id
         description: Cle vers la dimension commune.
         tests:
           - relationships:
-              arguments:
-                to: ref('dim_commune')
-                field: commune_id
+              to: ref('dim_commune')
+              field: commune_id
       - name: type_local_id
         description: Cle vers la dimension type de local.
         tests:
           - relationships:
-              arguments:
-                to: ref('dim_local')
-                field: type_local_id
+              to: ref('dim_local')
+              field: type_local_id
       - name: nature_mutation_id
         description: Cle vers la dimension nature de mutation.
         tests:
           - relationships:
-              arguments:
-                to: ref('dim_nature_mutation')
-                field: nature_mutation_id
+              to: ref('dim_nature_mutation')
+              field: nature_mutation_id
 
   - name: meteo_quotidien
     description: Mart meteo quotidien agregé par date.

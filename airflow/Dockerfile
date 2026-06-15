@@ -8,8 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 USER airflow
 RUN pip install --no-cache-dir \
-    dbt-core==1.9.1 \
-    dbt-postgres==1.9.1 \
-    protobuf>=5.28,<6 \
+    "dbt-core==1.9.1" \
+    "dbt-postgres==1.9.1" \
+    "dbt-snowflake==1.9.1" \
+    "protobuf>=5.28,<6" \
     apache-airflow-providers-snowflake \
-    snowflake-connector-python
+    snowflake-connector-python \
+    snowflake-sqlalchemy
