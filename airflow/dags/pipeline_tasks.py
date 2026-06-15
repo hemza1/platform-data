@@ -18,7 +18,7 @@ LON = 5.3811
 API_URL = "https://api.open-meteo.com/v1/forecast"
 
 # DVF
-DVF_URL = "https://www.data.gouv.fr/api/1/datasets/r/4d741143-8331-4b59-95c2-3b24a7bdbe3c"
+DVF_URL = "https://www.data.gouv.fr/api/1/datasets/r/902db087-b0eb-4cbb-a968-0b499bde5bc4"
 OUT_PATH = Path("/opt/airflow/data/dvf/2025/valeursfoncieres-2025-s1.txt.zip")
 DVF_STAGE_PATH = Path("/opt/airflow/data/dvf/2025/dvf_2025.txt")
 
