@@ -3,8 +3,8 @@ version: 2
 sources:
   - name: bronze
     description: Données brutes chargées en séance 3
-    database: "{{ var('source_database', 'warehouse') }}"
-    schema: "{{ var('source_schema', 'bronze') }}"
+    database: "{{ var('source_database', target.database if target.type == 'snowflake' else 'warehouse') }}"
+    schema: "{{ var('source_schema', 'BRONZE' if target.type == 'snowflake' else 'bronze') }}"
     tables:
       - name: dvf_2025_s1
         description: Mutations DVF (Demandes de valeurs foncières), format pipe
