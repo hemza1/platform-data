@@ -25,9 +25,9 @@ DBT_PROJECT_DIR = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
 
 DBT_CMD = (
-    "dbt --no-use-colors"
+    "DBT_TARGET_PATH=/tmp/dbt_target/postgres"
+    " dbt --no-use-colors"
     " --log-path /tmp/dbt_logs/postgres"
-    " --target-path /tmp/dbt_target/postgres"
 )
 DBT_FLAGS = (
     f"--profiles-dir {DBT_PROFILES_DIR}"

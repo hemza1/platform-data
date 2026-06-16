@@ -10,9 +10,9 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 DBT_PROJECT_DIR = "/opt/airflow/dbt_platform"
 DBT_PROFILES_DIR = "/opt/airflow/dbt_profiles"
 DBT_CMD = (
-    "dbt --no-use-colors"
+    "DBT_TARGET_PATH=/tmp/dbt_target/snowflake"
+    " dbt --no-use-colors"
     " --log-path /tmp/dbt_logs/snowflake"
-    " --target-path /tmp/dbt_target/snowflake"
 )
 DBT_FLAGS = (
     f"--profiles-dir {DBT_PROFILES_DIR}"
