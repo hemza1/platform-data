@@ -127,6 +127,33 @@ Verification des donnees apres un run complet:
 Le flux Snowflake de la séance 7 est orchestré par le DAG
 `elt_snowflake` dans `airflow/dags/elt_snowflake.py`.
 
+Deux DAGs Airflow sont reliés pour séparer l'orchestration ELT et les
+traitements dbt :
+
+```text
+elt_snowflake
+├── extract_dvf
+├── extract_meteo
+├── prepare_dvf_for_stage
+├── put_dvf_to_raw_stage
+├── put_meteo_to_raw_stage
+├── copy_dvf_to_bronze
+├── copy_meteo_to_bronze
+└── run_dbt_snowflake ──► déclenche dbt_platform_snowflake
+
+dbt_platform_snowflake
+├── dbt_deps
+├── dbt_run_silver
+├── dbt_run_gold
+├── dbt_test
+├── mark_silver_ready
+└── mark_gold_ready
+```
+
+La tâche `run_dbt_snowflake` est un `TriggerDagRunOperator` : elle déclenche le
+DAG `dbt_platform_snowflake`, attend sa fin, puis ne passe en succès que si le
+DAG dbt se termine correctement.
+
 Le lac utilise les stages internes du schéma `PLATFORM_DB.BRONZE` :
 
 - `RAW_STAGE` reçoit les fichiers bruts extraits par Airflow.
@@ -147,8 +174,20 @@ Déroulement du pipeline :
    `BRONZE.METEO_RAW`.
 4. Les données météo imbriquées sont exposées dans
    `BRONZE.METEO_QUOTIDIEN`.
-5. Le DAG déclenche `dbt_platform_snowflake`, qui construit et teste les
-   modèles Silver et Gold.
+5. `run_dbt_snowflake` déclenche `dbt_platform_snowflake`, qui exécute les
+   traitements dbt côté Snowflake : `dbt_run_silver`, `dbt_run_gold`, puis
+   `dbt_test`.
+
+Tables produites par dbt sur Snowflake :
+
+- `PLATFORM_DB.SILVER.DVF_MUTATIONS_GOLD`
+- `PLATFORM_DB.SILVER.METEO_QUOTIDIEN_GOLD`
+- `PLATFORM_DB.GOLD.DIM_COMMUNE`
+- `PLATFORM_DB.GOLD.DIM_LOCAL`
+- `PLATFORM_DB.GOLD.DIM_NATURE_MUTATION`
+- `PLATFORM_DB.GOLD.DIM_TEMPS`
+- `PLATFORM_DB.GOLD.FACT_MUTATIONS`
+- `PLATFORM_DB.GOLD.METEO_QUOTIDIEN`
 
 Contrôles Snowflake après un run :
 
@@ -159,6 +198,10 @@ SELECT COUNT(*) FROM PLATFORM_DB.BRONZE.METEO_QUOTIDIEN;
 SHOW TABLES IN SCHEMA PLATFORM_DB.SILVER;
 SHOW TABLES IN SCHEMA PLATFORM_DB.GOLD;
 ```
+
+Le target dbt Snowflake est défini dans `airflow/dbt_profiles/profiles.yml` et
+utilise les variables d'environnement `DBT_SNOWFLAKE_*` pour éviter de
+versionner des identifiants en clair.
 
 ## Gouvernance / Acces
 
@@ -184,11 +227,29 @@ Test RBAC a realiser:
 Les DAGs lisent les secrets depuis Airflow, pas depuis le code versionne:
 
 - Connection: `postgres_warehouse` (host/login/password/schema/port)
+- Connection: `snowflake_platform` (account/user/password/warehouse/database/role)
 - Variables:
     - `DVF_URL`
     - `OPEN_METEO_API_URL`
 
 Rappel: ne jamais committer de mot de passe, token ou cle API en clair dans le depot.
+
+### Roles Snowflake
+
+La gouvernance Snowflake est portée par Terraform avec deux rôles principaux :
+
+| Role Snowflake | Profil | Droits principaux |
+|----------------|--------|-------------------|
+| `ROLE_ENGINEER` | Data Engineer | Usage de `PLATFORM_WH`, usage de `PLATFORM_DB`, droits étendus sur `BRONZE`, `SILVER`, `GOLD` et sur le stage `RAW_STAGE` |
+| `ROLE_ANALYST` | Data Analyst | Usage de `PLATFORM_WH`, usage de `PLATFORM_DB`, accès au schéma `GOLD` et lecture des tables analytiques |
+
+Vérifications utiles :
+
+```sql
+SHOW ROLES LIKE 'ROLE_%';
+SHOW GRANTS TO ROLE ROLE_ENGINEER;
+SHOW GRANTS TO ROLE ROLE_ANALYST;
+```
 
 ## Modèles dbt
 
